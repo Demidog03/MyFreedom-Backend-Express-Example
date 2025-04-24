@@ -1,6 +1,7 @@
 import express from 'express'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
+import cors from 'cors'
 import TestRouter from './routes/Test.js'
 import AuthRouter from './routes/Auth.js'
 
@@ -14,6 +15,10 @@ const app = express()
 
 // Формат ресурса - JSON
 app.use(express.json())
+// Настройка CORS
+app.use(cors({
+    origin: 'http://localhost:5173'
+}))
 
 // Чтобы использовать роутер
 // TEST ROUTER
@@ -37,7 +42,3 @@ connectToMongoDb()
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}!`)
 })
-
-// HYz90oI63Vmh7evl
-// nilam27046
-// mongodb+srv://nilam27046:HYz90oI63Vmh7evl@cluster0.q4cjeez.mongodb.net/testapp?retryWrites=true&w=majority&appName=Cluster0

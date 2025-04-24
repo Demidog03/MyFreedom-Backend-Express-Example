@@ -78,16 +78,13 @@ router.post('/login', async (req, res) => {
         const accessToken = await jwt.sign(
             {...foundUser},
             process.env.JWT_SECRET,
-            { expiresIn: '2h' }
+            { expiresIn: '1h' }
         )
 
         res.status(200).json({
             status: 200,
             message: `Successful login!`,
             data: { 
-                id: foundUser._id,
-                username: foundUser.username,
-                email: foundUser.email,
                 accessToken
             }
         })
@@ -101,22 +98,26 @@ router.post('/login', async (req, res) => {
     }
 })
 
-router.get('/profile', (req, res) => { // авто-логин
+router.get('/profile', async (req, res) => { // авто-логин / получение профиля
     try {
-        const authorization = req.headers.authorization
+        const authorization = req.headers.authorization // "Authorization": "Bearer fdsknfmlsdnfls"
 
         if(!authorization || !authorization.startsWith('Bearer ')) {
-            return res.status(401).json({ message: 'Token is not provided!' });
+            res.status(401).json({ message: 'Token is not provided!' });
         }
 
-        const token = authorization.split(' ')[1] // ['Bearer', 'token']
-        const decodedUser = jwt.decode(token, process.env.JWT_SECRET)
-        delete decodedUser.password
+        const token = authorization.split(' ')?.[1] // ['Bearer', 'token']
+        const decodedUser = jwt.verify(token, process.env.JWT_SECRET)
+        const user = await User.findById(decodedUser._doc._id)
 
         res.status(200).json({
             status: 200,
             message: 'User successfully found!',
-            data: decodedUser
+            data: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
         })
     }
     catch (err) {
