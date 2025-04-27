@@ -1,7 +1,8 @@
 import express from 'express'
 import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
+import generateTokens from '../utils/generateTokens.js'
+import {verifyAccessToken, verifyRefreshToken} from '../middlewares/verifyToken.js'
 
 const router = express.Router()
 
@@ -75,17 +76,18 @@ router.post('/login', async (req, res) => {
             })
         }
 
-        const accessToken = await jwt.sign(
-            {...foundUser},
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        )
+        const { accessToken, refreshToken } = await generateTokens(foundUser)
+
+        // после генерации рефреш токена сохраняем в базе
+        foundUser.refreshToken = refreshToken
+        await foundUser.save()
 
         res.status(200).json({
             status: 200,
             message: `Successful login!`,
             data: { 
-                accessToken
+                accessToken,
+                refreshToken
             }
         })
     }
@@ -98,17 +100,9 @@ router.post('/login', async (req, res) => {
     }
 })
 
-router.get('/profile', async (req, res) => { // авто-логин / получение профиля
+router.get('/profile', verifyAccessToken, async (req, res) => { // авто-логин / получение профиля
     try {
-        const authorization = req.headers.authorization // "Authorization": "Bearer fdsknfmlsdnfls"
-
-        if(!authorization || !authorization.startsWith('Bearer ')) {
-            res.status(401).json({ message: 'Token is not provided!' });
-        }
-
-        const token = authorization.split(' ')?.[1] // ['Bearer', 'token']
-        const decodedUser = jwt.verify(token, process.env.JWT_SECRET)
-        const user = await User.findById(decodedUser._doc._id)
+        const user = req.user
 
         res.status(200).json({
             status: 200,
@@ -119,6 +113,59 @@ router.get('/profile', async (req, res) => { // авто-логин / получ
                 email: user.email
             }
         })
+    }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            status: 500,
+            message: 'Server error'
+        })
+    }
+})
+
+router.put('/profile/edit', verifyAccessToken, async (req, res) => {
+    try {
+        const user = req.user
+        const { username, email } = req.body
+        
+        user.username = username
+        user.email = email
+
+        await user.save()
+
+        res.status(200).json({
+            status: 200,
+            message: 'User successfully edited!',
+            data: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
+        })
+    }
+    catch (err) {
+        console.log(err)
+        res.status(500).json({
+            status: 500,
+            message: 'Server error'
+        })
+    }
+})
+
+router.get('/refresh', verifyRefreshToken, async (req, res) => {
+    try {
+        const user = req.user
+
+        const { accessToken, refreshToken: newRefreshToken } = await generateTokens(user)
+
+        user.refreshToken = newRefreshToken
+        await user.save()
+
+        res.status(200).json({
+            status: 200,
+            message: 'Tokens refreshed successfully!',
+            data: { accessToken, refreshToken: newRefreshToken }
+        });
     }
     catch (err) {
         console.log(err)
